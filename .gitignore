@@ -1,0 +1,10 @@
+# standard ignored files
+.venv/
+__pycache__/
+.vscode/
+.DS_Store
+
+# ignore data files
+*.csv
+*.json
+*.parquet
