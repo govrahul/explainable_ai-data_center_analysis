@@ -16,8 +16,8 @@ Next, create a .env file in the root directory and create these two free API key
 ## Data Loading
 To load all necessary data, first ensure your API keys have been created. Then, simply run:
 ```bash
-python load_facilities_data.py
-python load_eia_data.py
-python load_water_data.py
-python load_acs_data.py
+python Data/load_facilities_data.py
+python Data/load_eia_data.py
+python Data/load_water_data.py
+python Data/load_acs_data.py
 ```
