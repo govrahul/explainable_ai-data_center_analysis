@@ -1,15 +1,15 @@
 """
-Download ACS 5-Year socioeconomic data for every U.S. census tract.
+Download ACS 5-Year socioeconomic data for every U.S. county.
 
 Source:
     U.S. Census Bureau
     American Community Survey 5-Year Estimates
 
 Geography:
-    Census tract
+    County
 
 Output:
-    acs_tract_socioeconomic_2024.csv
+    acs_county_socioeconomic_2024.csv
 
 Requires:
     pip install requests pandas
@@ -45,58 +45,17 @@ BASE_URL = (
 
 
 # All 50 states + DC.
-# Puerto Rico is intentionally excluded for a U.S. states/DC analysis.
 STATE_FIPS = {
-    "01": "AL",
-    "02": "AK",
-    "04": "AZ",
-    "05": "AR",
-    "06": "CA",
-    "08": "CO",
-    "09": "CT",
-    "10": "DE",
-    "11": "DC",
-    "12": "FL",
-    "13": "GA",
-    "15": "HI",
-    "16": "ID",
-    "17": "IL",
-    "18": "IN",
-    "19": "IA",
-    "20": "KS",
-    "21": "KY",
-    "22": "LA",
-    "23": "ME",
-    "24": "MD",
-    "25": "MA",
-    "26": "MI",
-    "27": "MN",
-    "28": "MS",
-    "29": "MO",
-    "30": "MT",
-    "31": "NE",
-    "32": "NV",
-    "33": "NH",
-    "34": "NJ",
-    "35": "NM",
-    "36": "NY",
-    "37": "NC",
-    "38": "ND",
-    "39": "OH",
-    "40": "OK",
-    "41": "OR",
-    "42": "PA",
-    "44": "RI",
-    "45": "SC",
-    "46": "SD",
-    "47": "TN",
-    "48": "TX",
-    "49": "UT",
-    "50": "VT",
-    "51": "VA",
-    "53": "WA",
-    "54": "WV",
-    "55": "WI",
+    "01": "AL", "02": "AK", "04": "AZ", "05": "AR", "06": "CA",
+    "08": "CO", "09": "CT", "10": "DE", "11": "DC", "12": "FL",
+    "13": "GA", "15": "HI", "16": "ID", "17": "IL", "18": "IN",
+    "19": "IA", "20": "KS", "21": "KY", "22": "LA", "23": "ME",
+    "24": "MD", "25": "MA", "26": "MI", "27": "MN", "28": "MS",
+    "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH",
+    "34": "NJ", "35": "NM", "36": "NY", "37": "NC", "38": "ND",
+    "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI",
+    "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT",
+    "50": "VT", "51": "VA", "53": "WA", "54": "WV", "55": "WI",
     "56": "WY",
 }
 
@@ -129,12 +88,11 @@ VARIABLES = {
     "B02001_003E": "black_alone",
 
     # Hispanic / Latino
-    "B03003_001E": "hispanic_total",
-    "B03003_003E": "hispanic",
+    "B03002_001E": "hispanic_total",
+    "B03002_012E": "hispanic",
 
     # Housing
     "B25070_001E": "rent_universe",
-
     "B25070_007E": "rent_30_34_pct",
     "B25070_008E": "rent_35_39_pct",
     "B25070_009E": "rent_40_49_pct",
@@ -146,9 +104,9 @@ VARIABLES = {
 # DOWNLOAD FUNCTION
 # ============================================================
 
-def download_state(state_fips, state_abbr):
+def download_state_counties(state_fips, state_abbr):
     """
-    Download all census tracts for one state.
+    Download all census counties for one state.
     """
 
     variable_string = ",".join(
@@ -157,62 +115,35 @@ def download_state(state_fips, state_abbr):
 
     params = {
         "get": variable_string,
-
-        # All tracts in this state
-        "for": "tract:*",
-
-        # Restrict to state
+        # Target counties for this state
+        "for": "county:*",
         "in": f"state:{state_fips}",
-
         "key": API_KEY,
     }
 
-    print(
-        f"Downloading {state_abbr} "
-        f"(FIPS {state_fips})..."
-    )
+    print(f"Downloading counties for {state_abbr} (FIPS {state_fips})...")
 
-    response = requests.get(
-        BASE_URL,
-        params=params,
-        timeout=120
-    )
-
+    response = requests.get(BASE_URL, params=params, timeout=120)
     response.raise_for_status()
 
     data = response.json()
-
-    # First row contains column names
     columns = data[0]
 
-    df = pd.DataFrame(
-        data[1:],
-        columns=columns
-    )
+    df = pd.DataFrame(data[1:], columns=columns)
 
     # Rename ACS variables
     rename_dict = {
         variable: name
         for variable, name in VARIABLES.items()
     }
+    df = df.rename(columns=rename_dict)
 
-    df = df.rename(
-        columns=rename_dict
-    )
-
-    # Create useful FIPS fields
-    df["state_fips"] = df["state"].str.zfill(2)
+    # Create useful FIPS fields with zero padding (County level)
+    df["state_fips"] = df["state"].astype(str).str.zfill(2)
     df["county_fips"] = (
-        df["state"].str.zfill(2)
-        + df["county"].str.zfill(3)
+        df["state"].astype(str).str.zfill(2)
+        + df["county"].astype(str).str.zfill(3)
     )
-
-    df["tract_fips"] = (
-        df["state"].str.zfill(2)
-        + df["county"].str.zfill(3)
-        + df["tract"].str.zfill(6)
-    )
-
     df["state_abbr"] = state_abbr
 
     return df
@@ -223,123 +154,34 @@ def download_state(state_fips, state_abbr):
 # ============================================================
 
 def calculate_metrics(df):
-
     numeric_columns = [
-        column
-        for column in df.columns
+        column for column in df.columns
         if column not in [
-            "NAME",
-            "state",
-            "county",
-            "tract",
-            "state_fips",
-            "county_fips",
-            "tract_fips",
-            "state_abbr",
+            "NAME", "state", "county",
+            "state_fips", "county_fips", "state_abbr",
         ]
     ]
 
     for column in numeric_columns:
-        df[column] = pd.to_numeric(
-            df[column],
-            errors="coerce"
-        )
+        df[column] = pd.to_numeric(df[column], errors="coerce")
 
-    # --------------------------------------------------------
-    # Poverty rate
-    # --------------------------------------------------------
+    # Percentage calculations
+    df["poverty_pct"] = (df["poverty_below"] / df["poverty_universe"].replace(0, pd.NA)) * 100.0
+    df["unemployment_pct"] = (df["unemployed"] / df["labor_force"].replace(0, pd.NA)) * 100.0
+    df["bachelors_pct"] = (df["bachelors"] / df["education_universe"].replace(0, pd.NA)) * 100.0
+    df["black_pct"] = (df["black_alone"] / df["race_total"].replace(0, pd.NA)) * 100.0
+    df["hispanic_pct"] = (df["hispanic"] / df["hispanic_total"].replace(0, pd.NA)) * 100.0
 
-    df["poverty_pct"] = (
-        df["poverty_below"]
-        / df["poverty_universe"]
-        * 100
-    )
+    # Rent burden calculations
+    rent_cols = ["rent_30_34_pct", "rent_35_39_pct", "rent_40_49_pct", "rent_50_plus_pct"]
+    for col in rent_cols:
+        if col not in df.columns:
+            df[col] = 0.0
 
-    # --------------------------------------------------------
-    # Unemployment rate
-    # --------------------------------------------------------
+    df["rent_burden_30_plus"] = df[["rent_30_34_pct", "rent_35_39_pct", "rent_40_49_pct", "rent_50_plus_pct"]].sum(axis=1)
+    df["rent_burden_40_plus"] = df[["rent_40_49_pct", "rent_50_plus_pct"]].sum(axis=1)
 
-    df["unemployment_pct"] = (
-        df["unemployed"]
-        / df["labor_force"]
-        * 100
-    )
-
-    # --------------------------------------------------------
-    # Bachelor's degree or higher
-    # --------------------------------------------------------
-
-    df["bachelors_pct"] = (
-        df["bachelors"]
-        / df["education_universe"]
-        * 100
-    )
-
-    # --------------------------------------------------------
-    # Black population
-    # --------------------------------------------------------
-
-    df["black_pct"] = (
-        df["black_alone"]
-        / df["race_total"]
-        * 100
-    )
-
-    # --------------------------------------------------------
-    # Hispanic / Latino population
-    # --------------------------------------------------------
-
-    df["hispanic_pct"] = (
-        df["hispanic"]
-        / df["hispanic_total"]
-        * 100
-    )
-
-    # --------------------------------------------------------
-    # Severe rent burden
-    #
-    # ACS B25070 categories:
-    # 30-34.9%
-    # 35-39.9%
-    # 40-49.9%
-    # 50%+
-    # --------------------------------------------------------
-
-    df["rent_burden_30_plus"] = (
-        df[
-            [
-                "rent_30_34_pct",
-                "rent_35_39_pct",
-                "rent_40_49_pct",
-                "rent_50_plus_pct",
-            ]
-        ]
-        .sum(axis=1)
-    )
-
-    # --------------------------------------------------------
-    # 40%+ rent burden
-    # --------------------------------------------------------
-
-    df["rent_burden_40_plus"] = (
-        df[
-            [
-                "rent_40_49_pct",
-                "rent_50_plus_pct",
-            ]
-        ]
-        .sum(axis=1)
-    )
-
-    # --------------------------------------------------------
-    # Clean infinite values
-    # --------------------------------------------------------
-
-    df = df.replace(
-        [float("inf"), float("-inf")],
-        pd.NA
-    )
-
+    df = df.replace([float("inf"), float("-inf")], pd.NA)
     return df
 
 
@@ -348,203 +190,49 @@ def calculate_metrics(df):
 # ============================================================
 
 def main():
-
+    os.makedirs("Data", exist_ok=True)
     all_states = []
-
     total_states = len(STATE_FIPS)
 
-    for i, (state_fips, state_abbr) in enumerate(
-        STATE_FIPS.items(),
-        start=1
-    ):
-
-        print(
-            f"[{i}/{total_states}] ",
-            end=""
-        )
-
+    for i, (state_fips, state_abbr) in enumerate(STATE_FIPS.items(), start=1):
+        print(f"[{i}/{total_states}] ", end="")
         try:
-
-            df = download_state(
-                state_fips,
-                state_abbr
-            )
-
-            print(
-                f"    {len(df):,} census tracts"
-            )
-
+            df = download_state_counties(state_fips, state_abbr)
+            print(f"    {len(df):,} counties")
             all_states.append(df)
-
         except Exception as e:
-
-            print(
-                f"    ERROR: {e}"
-            )
-
-        # Be polite to the API
+            print(f"    ERROR: {e}")
         time.sleep(0.25)
 
-
-    # --------------------------------------------------------
-    # Combine states
-    # --------------------------------------------------------
-
     if not all_states:
-        raise RuntimeError(
-            "No ACS data were downloaded."
-        )
+        raise RuntimeError("No ACS county data were downloaded.")
 
-    df = pd.concat(
-        all_states,
-        ignore_index=True
-    )
-
-
-    # --------------------------------------------------------
-    # Calculate derived metrics
-    # --------------------------------------------------------
-
+    df = pd.concat(all_states, ignore_index=True)
     df = calculate_metrics(df)
-
-
-    # --------------------------------------------------------
-    # Add ACS vintage
-    # --------------------------------------------------------
-
     df["acs_year"] = YEAR
 
-
-    # --------------------------------------------------------
-    # Select final columns
-    # --------------------------------------------------------
-
     final_columns = [
-
-        # Geography
-        "tract_fips",
-        "county_fips",
-        "state_fips",
-        "state_abbr",
-        "NAME",
-
-        # ACS vintage
-        "acs_year",
-
-        # Population
-        "population",
-
-        # Income
-        "median_household_income",
-
-        # Poverty
-        "poverty_universe",
-        "poverty_below",
-        "poverty_pct",
-
-        # Employment
-        "labor_force",
-        "unemployed",
-        "unemployment_pct",
-
-        # Education
-        "education_universe",
-        "bachelors",
-        "bachelors_pct",
-
-        # Race
-        "race_total",
-        "black_alone",
-        "black_pct",
-
-        # Hispanic
-        "hispanic_total",
-        "hispanic",
-        "hispanic_pct",
-
-        # Housing
-        "rent_universe",
-        "rent_burden_30_plus",
-        "rent_burden_40_plus",
+        "county_fips", "state_fips", "state_abbr", "NAME",
+        "acs_year", "population", "median_household_income",
+        "poverty_universe", "poverty_below", "poverty_pct",
+        "labor_force", "unemployed", "unemployment_pct",
+        "education_universe", "bachelors", "bachelors_pct",
+        "race_total", "black_alone", "black_pct",
+        "hispanic_total", "hispanic", "hispanic_pct",
+        "rent_universe", "rent_burden_30_plus", "rent_burden_40_plus",
     ]
 
+    df = df[[c for c in final_columns if c in df.columns]]
 
-    df = df[
-        [
-            column
-            for column in final_columns
-            if column in df.columns
-        ]
-    ]
-
-
-    # --------------------------------------------------------
-    # Save
-    # --------------------------------------------------------
-
-    output_file = (
-        f"Data/acs_tract_socioeconomic_{YEAR}.csv"
-    )
-
-    df.to_csv(
-        output_file,
-        index=False
-    )
-
-
-    # --------------------------------------------------------
-    # Also save Parquet
-    # --------------------------------------------------------
-
-    parquet_file = (
-        f"acs_tract_socioeconomic_{YEAR}.parquet"
-    )
-
-    try:
-
-        df.to_parquet(
-            parquet_file,
-            index=False
-        )
-
-        parquet_message = (
-            f"Saved {parquet_file}"
-        )
-
-    except Exception as e:
-
-        parquet_message = (
-            f"Could not save Parquet: {e}"
-        )
-
-
-    # --------------------------------------------------------
-    # Summary
-    # --------------------------------------------------------
+    output_file = f"Data/acs_county_socioeconomic_{YEAR}.csv"
+    df.to_csv(output_file, index=False)
 
     print("\n" + "=" * 60)
     print("DOWNLOAD COMPLETE")
     print("=" * 60)
-
-    print(
-        f"Census tracts: {len(df):,}"
-    )
-
-    print(
-        f"States/DC: {df['state_fips'].nunique()}"
-    )
-
-    print(
-        f"CSV: {output_file}"
-    )
-
-    print(
-        parquet_message
-    )
-
-    print("\nColumns:")
-    for column in df.columns:
-        print(f"  {column}")
+    print(f"Total U.S. Counties: {len(df):,}")
+    print(f"States/DC: {df['state_fips'].nunique()}")
+    print(f"CSV: {output_file}")
 
 
 if __name__ == "__main__":
