@@ -30,8 +30,29 @@ st.markdown("""
 if 'page' not in st.session_state:
     st.session_state.page = 'Home'
 
+page_order = ('Home', 'Context', 'Map', 'Findings')
+page_navigation = (
+    ('Home', '🏠 1. Overview'),
+    ('Context', '📖 2. Context & Controversy'),
+    ('Map', '🗺️ 3. Interactive Footprint Map'),
+    ('Findings', '📊 4. Findings & Portfolio'),
+)
+if 'max_page_reached' not in st.session_state:
+    st.session_state.max_page_reached = page_order.index(st.session_state.page)
+if 'exploration_complete' not in st.session_state:
+    st.session_state.exploration_complete = st.session_state.page == 'Findings'
+
 def navigate_to(page_name):
+    page_index = page_order.index(page_name)
+    if page_index > st.session_state.max_page_reached + 1:
+        return
+
     st.session_state.page = page_name
+    st.session_state.max_page_reached = max(
+        st.session_state.max_page_reached, page_index
+    )
+    if page_name == 'Findings':
+        st.session_state.exploration_complete = True
 
 # ============================================================
 # DATA LOADER
@@ -53,15 +74,21 @@ df = load_data()
 with st.sidebar:
     st.image("https://img.icons8.com/fluency/96/lightning-bolt.png", width=64)
     st.title("Navigation")
-    
-    # Active state button check
-    if st.button("🏠 1. Overview", use_container_width=True, type="primary"):
-        navigate_to('Home')
-        st.rerun()
-        
-    st.button("📖 2. Context & Controversy", use_container_width=True, disabled=True)
-    st.button("🗺️ 3. Interactive Footprint Map", use_container_width=True, disabled=True)
-    st.button("📊 4. Findings & Portfolio", use_container_width=True, disabled=True)
+
+    for page_name, label in page_navigation:
+        page_index = page_order.index(page_name)
+        if st.button(
+            label,
+            key=f"nav_{page_name}",
+            use_container_width=True,
+            type="primary" if st.session_state.page == page_name else "secondary",
+            disabled=(
+                not st.session_state.exploration_complete
+                and page_index > st.session_state.max_page_reached
+            )
+        ):
+            navigate_to(page_name)
+            st.rerun()
             
     st.markdown("---")
     st.markdown("### Project Stack")
@@ -177,17 +204,29 @@ elif st.session_state.page == 'Map':
     st.markdown("# 🗺️ Interactive Facility Footprint Map")
     st.markdown("Inspect individual data center facilities, filter by state or capacity, and view matched environmental and socioeconomic metrics.")
     
-    # Sidebar Filters for the Map
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### Map Filters")
-    
+    st.markdown("### Map Filters")
     state_col = 'state_abbr' if 'state_abbr' in df.columns else 'location_state'
     available_states = sorted(df[state_col].dropna().unique().tolist()) if state_col in df.columns else []
-    selected_state = st.sidebar.selectbox("Filter by State", ["ALL"] + available_states)
-    
     cap_col = 'est_capacity' if 'est_capacity' in df.columns else 'capacityMw_operational'
     max_cap = int(df[cap_col].max()) if cap_col in df.columns and not df[cap_col].dropna().empty else 200
-    min_cap = st.sidebar.slider("Minimum Operational Capacity (MW)", 0, max(max_cap, 10), 0)
+
+    filter_col_state, filter_col_capacity, filter_col_metric = st.columns([1, 1, 2])
+    with filter_col_state:
+        selected_state = st.selectbox("Filter by State", ["ALL"] + available_states)
+    with filter_col_capacity:
+        min_cap = st.slider("Minimum Capacity (MW)", 0, max(max_cap, 10), 0)
+    with filter_col_metric:
+        metric_options = (
+            "Capacity (MW)",
+            "Carbon Intensity (lbs CO₂/MWh)",
+            "Drought Risk (DSCI)",
+            "Median Household Income ($)",
+        )
+        selected_metric = st.selectbox(
+            "Color map by",
+            options=list(metric_options),
+            key="map_metric"
+        )
     
     # Filter dataframe
     filtered_df = df.copy()
@@ -197,18 +236,6 @@ elif st.session_state.page == 'Map':
     if cap_col in filtered_df.columns:
         filtered_df = filtered_df[filtered_df[cap_col].fillna(0) >= min_cap]
 
-    metric_options = (
-        "Capacity (MW)",
-        "Carbon Intensity (lbs CO₂/MWh)",
-        "Drought Risk (DSCI)",
-        "Median Household Income ($)",
-    )
-    selected_metric = st.selectbox(
-        "Color map by",
-        options=list(metric_options),
-        key="map_metric"
-    )
-        
     col_map, col_card = st.columns([2, 1])
 
     lat_col = 'location_lat' if 'location_lat' in filtered_df.columns else 'latitude'
@@ -292,8 +319,14 @@ elif st.session_state.page == 'Map':
                 zoom=3,
                 height=550
             )
+            if selected_metric != "Capacity (MW)":
+                fig.update_traces(marker_size=10)
             fig.update_layout(
                 map_style="open-street-map",
+                map={
+                    "center": {"lat": 39.5, "lon": -98.35},
+                    "zoom": 3,
+                },
                 margin={"r":0,"t":0,"l":0,"b":0},
                 coloraxis=coloraxis_config
             )
@@ -304,7 +337,7 @@ elif st.session_state.page == 'Map':
                 width="stretch",
                 on_select="rerun",
                 selection_mode="points",
-                key=f"facility_map_{selected_state}_{min_cap}"
+                key=f"facility_map_{selected_state}_{min_cap}_{selected_metric}"
             )
         else:
             st.warning("No facility coordinates available for current filter selection.")
@@ -323,16 +356,27 @@ elif st.session_state.page == 'Map':
             selected_points = selection.get("points", [])
             map_facility_id = None
             if selected_points:
-                point_custom_data = selected_points[0].get("customdata", [])
-                if point_custom_data:
-                    map_facility_id = map_facility_ids.get(point_custom_data[0])
+                selected_point = selected_points[0]
+                point_custom_data = selected_point.get("customdata")
+                if isinstance(point_custom_data, (list, tuple)) and point_custom_data:
+                    row_id = pd.to_numeric(point_custom_data[0], errors="coerce")
+                    if pd.notna(row_id) and float(row_id).is_integer():
+                        map_facility_id = map_facility_ids.get(int(row_id))
+
+                if map_facility_id is None:
+                    point_index = selected_point.get("point_index")
+                    if isinstance(point_index, int) and 0 <= point_index < len(map_df):
+                        map_facility_id = map_df.index[point_index]
 
             last_map_facility_id = st.session_state.get("_last_map_facility_id")
-            if map_facility_id is not None:
+            if map_facility_id in facility_ids:
                 if map_facility_id != last_map_facility_id:
                     st.session_state["audit_facility_id"] = map_facility_id
                     st.session_state["_last_map_facility_id"] = map_facility_id
+            elif map_facility_id is None:
+                st.session_state["_last_map_facility_id"] = None
             else:
+                map_facility_id = None
                 st.session_state["_last_map_facility_id"] = None
 
             if st.session_state.get("audit_facility_id") not in facility_ids:
@@ -341,7 +385,7 @@ elif st.session_state.page == 'Map':
             selected_facility_id = st.selectbox(
                 "Select Facility",
                 facility_ids,
-                format_func=lambda facility_id: facility_labels[facility_id],
+                format_func=lambda facility_id: facility_labels.get(facility_id, str(facility_id)),
                 key="audit_facility_id"
             )
             fac_row = filtered_df.loc[selected_facility_id]
@@ -378,4 +422,49 @@ elif st.session_state.page == 'Map':
             navigate_to('Context')
             st.rerun()
     with col_next:
-        st.button("Explore Key Findings ➔ (Coming Next)", disabled=True)
+        if st.button("Explore Key Findings ➔"):
+            navigate_to('Findings')
+            st.rerun()
+
+# ============================================================
+# PAGE 4: FINDINGS & PORTFOLIO
+# ============================================================
+elif st.session_state.page == 'Findings':
+    st.markdown("# 📊 Key Findings & Strategic Next Steps")
+    st.markdown("Summary takeaways from our multi-layered national infrastructure audit.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        ### Key Analytical Takeaways
+        1. **Grid Carbon Disparities:** Facilities sited in fossil-heavy ISO regions generate significantly more emissions per Megawatt-hour than those in clean grids.
+        2. **Water-Energy Nexus:** A notable percentage of new data center expansion is occurring in counties experiencing moderate-to-high drought stress, heightening local municipal friction.
+        3. **Equitable Sighting:** While median household incomes in host tracts vary widely, proactive zoning policies can successfully align tech economic development with community protections.
+        """)
+    with col2:
+        st.markdown("""
+        ### Policy & Engineering Recommendations
+        * **Mandatory PUE & WUE Transparency:** Require public reporting of Power Usage Effectiveness and Water Usage Effectiveness for all subsidized data centers.
+        * **Renewable Matching:** Enforce 24/7 carbon-free energy matching rather than annual certificate offsets.
+        * **Community Benefit Agreements (CBAs):** Direct infrastructure tax revenues toward local educational and water conservation funds in host census tracts.
+        """)
+        
+    st.markdown("---")
+    
+    # Dataset Download
+    csv_data = df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Master Responsible AI Footprint Dataset (CSV)",
+        data=csv_data,
+        file_name="master_dataset.csv",
+        mime="text/csv",
+        type="primary"
+    )
+    
+    st.markdown("---")
+    st.markdown("### Connect & Collaborators")
+    col_gh, col_li = st.columns(2)
+    with col_gh:
+        st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/govrahul/explainable_ai-data_center_analysis)")
+    with col_li:
+        st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/govrahul)")
