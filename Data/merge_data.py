@@ -201,6 +201,13 @@ def build_master_dataset() -> pd.DataFrame:
     master = master.drop(columns="_state_key")
     if len(master) != len(facilities) or master["id"].duplicated().any():
         raise ValueError("Joins changed the facility row count or duplicated IDs")
+
+    # estimate jobs created based on capacity and industry-standard multipliers
+    master['est_capacity'] = master['capacityMw_operational'].combine_first(master['capacityMw_planned'])
+    master['est_direct_jobs'] = (master['est_capacity'] * 0.4).clip(lower=0).round()
+    master['est_total_operational_jobs'] = (master['est_direct_jobs'] * 3.0).round()
+    master['est_construction_jobs_peak'] = (master['est_capacity'] * 15.0).round()
+    
     return master
 
 
