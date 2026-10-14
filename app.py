@@ -312,7 +312,7 @@ elif st.session_state.page == 'Map':
                 map_df,
                 lat=lat_col,
                 lon=lon_col,
-                size=metric_col if selected_metric == "Capacity (MW)" and metric_values_available else None,
+                size=cap_col,
                 color=metric_col if metric_values_available else None,
                 color_continuous_scale=color_scale,
                 size_max=36,
@@ -323,8 +323,6 @@ elif st.session_state.page == 'Map':
                 zoom=3,
                 height=550
             )
-            if selected_metric != "Capacity (MW)":
-                fig.update_traces(marker_size=10)
             fig.update_layout(
                 map_style="open-street-map",
                 map={
