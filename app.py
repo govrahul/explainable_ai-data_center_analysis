@@ -30,12 +30,13 @@ st.markdown("""
 if 'page' not in st.session_state:
     st.session_state.page = 'Home'
 
-page_order = ('Home', 'Context', 'Map', 'Findings')
+page_order = ('Home', 'Context', 'Map', 'Findings', 'Limitations')
 page_navigation = (
     ('Home', '1. Overview'),
     ('Context', '2. Context & Controversy'),
     ('Map', '3. Interactive Footprint Map'),
     ('Findings', '4. Findings & Portfolio'),
+    ('Limitations', '5. Methodology & Limitations'),
 )
 if 'max_page_reached' not in st.session_state:
     st.session_state.max_page_reached = page_order.index(st.session_state.page)
@@ -471,3 +472,64 @@ elif st.session_state.page == 'Findings':
         st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/govrahul/explainable_ai-data_center_analysis)")
     with col_li:
         st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/govrahul)")
+
+    with st.expander("Full Methodology & Limitations Report"):
+        st.markdown("""
+        This report details the data assumptions, estimation models, and structural constraints of this infrastructure audit. It includes information on emissions estimation, drought and water stress metrics, economic and job creation estimates, and spatial join precision.
+        """)
+        if st.button("View Full Methodology & Limitations"):
+            navigate_to('Limitations')
+            st.rerun()
+
+# ============================================================
+# PAGE 5: METHODOLOGY & LIMITATIONS CONTENT
+# ============================================================
+elif st.session_state.page == 'Limitations':
+    st.markdown("# ℹ️ Methodology & Analytical Limitations")
+    st.markdown("Transparency report detailing data assumptions, estimation models, and structural constraints of this infrastructure audit.")
+    
+    st.markdown("---")
+    
+    col_l, col_r = st.columns(2)
+    with col_l:
+        st.markdown("### ⚡ 1. Emissions Estimation Model")
+        st.markdown("""
+        * **Methodology:** Annual carbon emissions are modeled by scaling facility operational capacity (`capacityMw_operational`) against regional grid carbon intensity factors ($\text{lbs } CO_2/\text{MWh}$) sourced from the **EPA eGRID database**.
+        * **Limitations:** 
+          * Assumes a generalized 24/7 continuous baseload capacity factor rather than real-time dynamic server utilization or actual power purchase agreements (PPAs) involving off-site renewables or nuclear allocation.
+          * Does not account for scope 3 embodied carbon (manufacturing and chip fabrication supply chains).
+        """)
+        
+        st.markdown("### 💧 2. Drought & Water Stress Metric")
+        st.markdown("""
+        * **Methodology:** County-level drought exposure is evaluated using the **U.S. Drought Monitor (USDM)** categorical percentages aggregated into the standard Drought Severity and Coverage Index (DSCI).
+        * **Limitations:** 
+          * Drought indices reflect regional climate and meteorological drought rather than industrial municipal water rights allocations or closed-loop cooling recycling rates.
+        """)
+        
+    with col_r:
+        st.markdown("### 🧑‍💼 3. Economic & Job Creation Estimates")
+        st.markdown("""
+        * **Methodology:** Operational and economic multipliers are derived from standard regional economic development benchmarks (~0.4 direct operational jobs per MW, scaled by a 3.0 total employment multiplier for indirect and induced local impact).
+        * **Limitations:** 
+          * These are *modeled regional projections* rather than verified corporate payroll audits. Actual local hiring varies significantly based on automation level, cloud provider outsourcing, and local labor market availability.
+        """)
+        
+        st.markdown("### 🗺️ 4. Spatial Join & FIPS Precision")
+        st.markdown("""
+        * **Methodology:** Facilities (Compute Atlas coordinates) are spatially mapped and joined to county-level drought and socioeconomic tables using 5-digit FIPS codes.
+        * **Limitations:** 
+          * Large rural counties or sprawling facility footprints can occasionally span multiple census tracts, leading to localized demographic blurring.
+        """)
+
+    st.markdown("---")
+    
+    col_back, col_home = st.columns(2)
+    with col_back:
+        if st.button("⬅ Back to Findings"):
+            navigate_to('Findings')
+            st.rerun()
+    with col_home:
+        if st.button("🏠 Return to Home"):
+            navigate_to('Home')
+            st.rerun()
