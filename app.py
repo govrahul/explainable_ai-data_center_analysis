@@ -17,7 +17,7 @@ st.set_page_config(
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #f0f2f6; }
-    .hero-title { font-size: 2.5rem; font-weight: 800; color: #06b6d4; margin-bottom: 0px; }
+    .hero-title { font-size: 2.5rem; font-weight: 800; color: #f0f2f6; margin-bottom: 0px; }
     .hero-subtitle { font-size: 1.2rem; color: #9ca3af; margin-bottom: 2rem; }
     .card { background-color: #1f2937; color: #f9fafb; padding: 1.5rem; border-radius: 0.75rem; border: 1px solid #374151; margin-bottom: 1rem; }
     .card h4, .card p { color: #f9fafb; }
@@ -32,10 +32,10 @@ if 'page' not in st.session_state:
 
 page_order = ('Home', 'Context', 'Map', 'Findings')
 page_navigation = (
-    ('Home', '🏠 1. Overview'),
-    ('Context', '📖 2. Context & Controversy'),
-    ('Map', '🗺️ 3. Interactive Footprint Map'),
-    ('Findings', '📊 4. Findings & Portfolio'),
+    ('Home', '1. Overview'),
+    ('Context', '2. Context & Controversy'),
+    ('Map', '3. Interactive Footprint Map'),
+    ('Findings', '4. Findings & Portfolio'),
 )
 if 'max_page_reached' not in st.session_state:
     st.session_state.max_page_reached = page_order.index(st.session_state.page)
@@ -72,7 +72,6 @@ df = load_data()
 # SIDEBAR NAVIGATION & PROGRESS
 # ============================================================
 with st.sidebar:
-    st.image("https://img.icons8.com/fluency/96/lightning-bolt.png", width=64)
     st.title("Navigation")
 
     for page_name, label in page_navigation:
@@ -92,13 +91,17 @@ with st.sidebar:
             
     st.markdown("---")
     st.markdown("### Project Stack")
-    st.markdown("• **Backend:** Python / Pandas\n• **Geospatial:** Census & eGRID\n• **Frontend:** Streamlit & Plotly")
+    st.markdown("""
+        * **Backend:** Python / Pandas 
+        * **Geospatial:** Census & eGRID 
+        * **Frontend:** Streamlit & Plotly
+    """)
 
 # ============================================================
 # PAGE 1: HOME PAGE CONTENT
 # ============================================================
 if st.session_state.page == 'Home':
-    st.markdown('<p class="hero-title">⚡ Responsible AI Infrastructure Footprint</p>', unsafe_allow_html=True)
+    st.markdown('### Responsible AI Infrastructure Footprint')
     st.markdown('<p class="hero-subtitle">Evaluating the hidden environmental, water, and socioeconomic trade-offs of generative AI data centers across the United States.</p>', unsafe_allow_html=True)
     
     # Executive KPI Summary Cards
@@ -145,7 +148,7 @@ if st.session_state.page == 'Home':
 # PAGE 2: CONTEXT & CONTROVERSY CONTENT
 # ============================================================
 elif st.session_state.page == 'Context':
-    st.markdown("# 📖 The Context & Controversy")
+    st.markdown("# The Context & Controversy")
     st.markdown("Understanding why data center siting has become one of the most contentious infrastructure debates of the decade.")
     
     tab1, tab2, tab3 = st.tabs(["⚡ Power & Carbon", "💧 Water Stress", "⚖️ Environmental Justice"])
@@ -155,12 +158,12 @@ elif st.session_state.page == 'Context':
         with col1:
             st.markdown("### The Energy Wall")
             st.markdown("""
-            A single hyperscale AI training cluster can draw **100 to 300+ Megawatts**—equivalent to powering tens of thousands of homes. 
+            Large AI data center installations can require **hundreds of megawatts** of electricity, comparable to the power demand of tens of thousands of homes. Actual demand varies with facility size, computing hardware, and cooling requirements. 
             
             Because AI training requires 24/7 continuous baseload power, tech companies are increasingly seeking direct deals with nuclear plants or extending the lifespan of coal and natural gas facilities, directly impacting state carbon reduction goals.
             """)
         with col2:
-            st.info("**Key Metric:** Data centers are projected to account for nearly 9% of total U.S. electricity generation by 2030.")
+            st.info("**Key Metric:** Data centers could account for roughly 9%–12% of U.S. electricity consumption by 2030, with projections varying by study and assumptions. A 2026 Lawrence Berkeley National Laboratory report estimates a central scenario of 11.8%.")
             
     with tab2:
         col1, col2 = st.columns(2)
@@ -172,7 +175,7 @@ elif st.session_state.page == 'Context':
             When facilities are sited in water-stressed counties (such as parts of Arizona, Texas, or drought-affected agricultural corridors), heavy industrial water usage competes directly with municipal and agricultural needs.
             """)
         with col2:
-            st.warning("**Risk Factor:** Over 35% of tracked data center capacity resides in counties facing moderate-to-severe seasonal drought stress.")
+            st.warning("**Risk Factor:** A substantial share of data center capacity may be located in areas exposed to seasonal drought risk. This can exacerbate local water scarcity, causing larger impacts on the community and environment.")
             
     with tab3:
         col1, col2 = st.columns(2)
@@ -201,7 +204,7 @@ elif st.session_state.page == 'Context':
 # PAGE 3: INTERACTIVE MAP CONTENT
 # ============================================================
 elif st.session_state.page == 'Map':
-    st.markdown("# 🗺️ Interactive Facility Footprint Map")
+    st.markdown("# Interactive Facility Footprint Map")
     st.markdown("Inspect individual data center facilities, filter by state or capacity, and view matched environmental and socioeconomic metrics.")
     
     st.markdown("### Map Filters")
@@ -430,23 +433,23 @@ elif st.session_state.page == 'Map':
 # PAGE 4: FINDINGS & PORTFOLIO
 # ============================================================
 elif st.session_state.page == 'Findings':
-    st.markdown("# 📊 Key Findings & Strategic Next Steps")
+    st.markdown("# Key Findings & Strategic Next Steps")
     st.markdown("Summary takeaways from our multi-layered national infrastructure audit.")
     
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("""
         ### Key Analytical Takeaways
-        1. **Grid Carbon Disparities:** Facilities sited in fossil-heavy ISO regions generate significantly more emissions per Megawatt-hour than those in clean grids.
-        2. **Water-Energy Nexus:** A notable percentage of new data center expansion is occurring in counties experiencing moderate-to-high drought stress, heightening local municipal friction.
-        3. **Equitable Sighting:** While median household incomes in host tracts vary widely, proactive zoning policies can successfully align tech economic development with community protections.
+        1. **Concentration of Capacity:** Many data centers are located very close to each other, raising concerns about local grid stress and community impacts.
+        2. **Water Stress**: Few data centers are located in water-stressed regions, but they could have lasting impacts on local water availability if not managed properly.
+        3. **Socioeconomic Disparities:** A significant number of data centers are located in counties with lower median household incomes, raising questions about equitable distribution of benefits and burdens.
         """)
     with col2:
         st.markdown("""
         ### Policy & Engineering Recommendations
-        * **Mandatory PUE & WUE Transparency:** Require public reporting of Power Usage Effectiveness and Water Usage Effectiveness for all subsidized data centers.
-        * **Renewable Matching:** Enforce 24/7 carbon-free energy matching rather than annual certificate offsets.
-        * **Community Benefit Agreements (CBAs):** Direct infrastructure tax revenues toward local educational and water conservation funds in host census tracts.
+        1. **Mandatory PUE & WUE Transparency:** Require public reporting of Power Usage Effectiveness and Water Usage Effectiveness for all subsidized data centers.
+        2. **Community Benefit Agreements (CBAs):** Direct infrastructure tax revenues toward local educational and water conservation funds in host census tracts.
+        3. **Community Engagement:** Establish ways for local communities to have a voice in data center decisions, ensuring their concerns are heard and truly taken into account.
         """)
         
     st.markdown("---")
