@@ -9,3 +9,6 @@ __pycache__/
 *.csv
 *.json
 *.parquet
+
+# unignore specific CSV required for Streamlit app
+!Data/master_dataset.csv
