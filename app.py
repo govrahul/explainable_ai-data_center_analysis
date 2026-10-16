@@ -94,7 +94,7 @@ with st.sidebar:
     st.markdown("### Project Stack")
     st.markdown("""
         * **Backend:** Python / Pandas 
-        * **Geospatial:** Census & eGRID 
+        * **Geospatial:** Census & U.S. Drought Monitor
         * **Frontend:** Streamlit & Plotly
     """)
 
@@ -128,7 +128,7 @@ if st.session_state.page == 'Home':
         st.markdown("""
         The explosive growth of Large Language Models and generative AI infrastructure is straining local power grids, accelerating water consumption in drought-prone regions, and reshaping communities. 
         
-        This dashboard bridges facility-level engineering data with **U.S. Census Bureau socioeconomic indicators**, **EPA eGRID carbon intensities**, and **U.S. Drought Monitor risk tiers** to give researchers, policymakers, and communities a clear picture of AI's physical footprint.
+        This dashboard bridges facility-level data with **U.S. Census Bureau socioeconomic indicators**, **state-level grid carbon intensities calculated from EIA electricity data using EPA fuel-emission factors**, and **U.S. Drought Monitor conditions** to give researchers, policymakers, and communities a picture of AI's physical footprint.
         """)
         
         # Placeholder transition for next page (to be unlocked in step 2)
@@ -139,9 +139,9 @@ if st.session_state.page == 'Home':
     with col_r:
         st.markdown("### Key Data Sources")
         st.markdown("""
-        * **US Census ACS (2024):** Tract/County socioeconomics
+        * **U.S. Census ACS (2024):** County socioeconomic indicators
         * **U.S. Drought Monitor:** County-level water stress
-        * **EPA eGRID:** Grid emissions factors
+        * **EIA electricity data & EPA fuel-emission factors:** State grid carbon intensity
         * **Compute Atlas:** Facility coordinates & capacity
         """)
 
@@ -207,6 +207,12 @@ elif st.session_state.page == 'Context':
 elif st.session_state.page == 'Map':
     st.markdown("# Interactive Facility Footprint Map")
     st.markdown("Inspect individual data center facilities, filter by state or capacity, and view matched environmental and socioeconomic metrics.")
+    st.info(
+        "**Map-only capacity placeholder:** When both reported operational and planned "
+        "capacity are missing, the map uses 10 MW as a display fallback so the facility "
+        "can be sized, filtered, and colored on the map. This is not a reported facility "
+        "capacity; the underlying dataset and analysis estimates are not filled with 10 MW."
+    )
     
     st.markdown("### Map Filters")
     state_col = 'state_abbr' if 'state_abbr' in df.columns else 'location_state'
@@ -223,7 +229,7 @@ elif st.session_state.page == 'Map':
         metric_options = (
             "Capacity (MW)",
             "Carbon Intensity (lbs CO₂/MWh)",
-            "Drought Risk (DSCI)",
+            "Weighted Drought Exposure Score (custom)",
             "Median Household Income ($)",
         )
         selected_metric = st.selectbox(
@@ -234,7 +240,9 @@ elif st.session_state.page == 'Map':
     
     # Filter dataframe
     filtered_df = df.copy()
-    filtered_df[cap_col] = pd.to_numeric(filtered_df[cap_col], errors='coerce').fillna(10.0)
+    capacity_values = pd.to_numeric(filtered_df[cap_col], errors='coerce')
+    filtered_df["_map_capacity_is_placeholder"] = capacity_values.isna()
+    filtered_df[cap_col] = capacity_values.fillna(10.0)
     if selected_state != "ALL" and state_col in filtered_df.columns:
         filtered_df = filtered_df[filtered_df[state_col] == selected_state]
     if cap_col in filtered_df.columns:
@@ -258,7 +266,7 @@ elif st.session_state.page == 'Map':
         map_df[metric_col] = pd.to_numeric(
             map_df.get("grid_lbs_co2_per_mwh"), errors="coerce"
         )
-    elif selected_metric == "Drought Risk (DSCI)":
+    elif selected_metric == "Weighted Drought Exposure Score (custom)":
         drought_weights = {
             "drought_d0": 1,
             "drought_d1": 2,
@@ -396,11 +404,25 @@ elif st.session_state.page == 'Map':
             status = fac_row.get('status', 'N/A')
             fac_state = fac_row.get(state_col, 'N/A')
             fac_cap = fac_row.get(cap_col, 'N/A')
-            co2_lbs = fac_row.get('grid_annual_co2_lbs', 0)
-            co2_tons = (co2_lbs / 2000.0) if pd.notna(co2_lbs) else 'N/A'
+            operational_capacity = pd.to_numeric(
+                fac_row.get('capacityMw_operational'), errors='coerce'
+            )
+            grid_intensity = pd.to_numeric(
+                fac_row.get('grid_lbs_co2_per_mwh'), errors='coerce'
+            )
+            co2_tons = (
+                operational_capacity * 8760 * 0.85 * grid_intensity / 2000.0
+                if pd.notna(operational_capacity) and pd.notna(grid_intensity)
+                else None
+            )
             drought_val = fac_row.get('drought_d1', 'N/A')
             med_inc = fac_row.get('median_household_income', 'N/A')
             jobs = fac_row.get('est_total_operational_jobs', 'N/A')
+            if fac_row.get("_map_capacity_is_placeholder", False):
+                fac_cap = "10 (map-only placeholder; capacity not reported)"
+            annual_co2_display = (
+                f"{co2_tons:,.0f} Tons" if co2_tons is not None else "N/A"
+            )
             
             st.markdown(f"""
             <div class="card">
@@ -408,8 +430,8 @@ elif st.session_state.page == 'Map':
                 <p><b>Status:</b> {status}</p>
                 <p><b>State:</b> {fac_state}</p>
                 <p><b>Capacity:</b> {fac_cap} MW</p>
-                <p><b>Est. Annual CO₂:</b> {f"{co2_tons:,.0f} Tons" if isinstance(co2_tons, (int, float)) else 'N/A'}</p>
-                <p><b>Drought Stress Index:</b> {drought_val}</p>
+                <p><b>Est. Annual CO₂:</b> {annual_co2_display}</p>
+                <p><b>County area in D1 drought (%):</b> {drought_val}</p>
                 <p><b>Host Median Income:</b> {f"${med_inc:,.0f}" if isinstance(med_inc, (int, float)) else 'N/A'}</p>
                 <p><b>Est. Total Jobs Created:</b> {jobs}</p>
             </div>
@@ -490,35 +512,45 @@ elif st.session_state.page == 'Limitations':
     
     col_l, col_r = st.columns(2)
     with col_l:
-        st.markdown("### ⚡ 1. Emissions Estimation Model")
+        st.markdown("### 1. Emissions Estimation Model")
         st.markdown("""
-        * **Methodology:** Annual carbon emissions are modeled by scaling facility operational capacity (`capacityMw_operational`) against regional grid carbon intensity factors ($\text{lbs } CO_2/\text{MWh}$) sourced from the **EPA eGRID database**.
-        * **Limitations:** 
-          * Assumes a generalized 24/7 continuous baseload capacity factor rather than real-time dynamic server utilization or actual power purchase agreements (PPAs) involving off-site renewables or nuclear allocation.
-          * Does not account for scope 3 embodied carbon (manufacturing and chip fabrication supply chains).
+        * **Methodology:** The data pipeline converts reported EIA state-level fuel consumption to CO₂ using EPA fuel-specific emission factors, aggregates it by state and year, and divides by annual electricity generation to calculate grid intensity ($\text{lbs CO}_2/\text{MWh}$). The dashboard uses the 2024 state intensity and estimates facility emissions as operational capacity × 8,760 hours × an assumed 0.85 capacity factor × grid intensity, divided by 2,000 pounds per short ton.
+        * **Limitations:**
+          * This is an estimate based on a state-average grid mix and a uniform 85% capacity factor, not measured facility electricity use or emissions. It does not reflect facility-specific procurement, power purchase agreements, or onsite generation.
+          * Only fuel types with an emission factor in the loader are counted; other fuel types receive a zero factor. The estimate uses operational capacity only, so planned capacity is excluded.
+          * It estimates operational CO₂ only and excludes Scope 3 embodied emissions from equipment manufacturing and supply chains.
         """)
         
-        st.markdown("### 💧 2. Drought & Water Stress Metric")
+        st.markdown("### 2. Drought & Water Stress Metric")
         st.markdown("""
-        * **Methodology:** County-level drought exposure is evaluated using the **U.S. Drought Monitor (USDM)** categorical percentages aggregated into the standard Drought Severity and Coverage Index (DSCI).
-        * **Limitations:** 
-          * Drought indices reflect regional climate and meteorological drought rather than industrial municipal water rights allocations or closed-loop cooling recycling rates.
+        * **Methodology:** The pipeline joins U.S. Drought Monitor county area-percentage records to facilities by county FIPS and keeps the latest available observation for each county. The map's custom weighted score sums the area percentage in each category multiplied by its assigned weight (D0=1 through D4=5). The facility card separately reports the county area percentage in D1.
+        * **Limitations:**
+          * This weighted score is a project-defined metric, not the official Drought Severity and Coverage Index (DSCI). It describes county-wide drought conditions, not a facility's water withdrawal, consumption, water rights, cooling system, or water recycling.
+          * The score uses the latest observation in the downloaded data rather than a time series, so it does not represent seasonal or long-term drought exposure.
         """)
         
     with col_r:
-        st.markdown("### 🧑‍💼 3. Economic & Job Creation Estimates")
+        st.markdown("### 3. Economic & Job Creation Estimates")
         st.markdown("""
-        * **Methodology:** Operational and economic multipliers are derived from standard regional economic development benchmarks (~0.4 direct operational jobs per MW, scaled by a 3.0 total employment multiplier for indirect and induced local impact).
-        * **Limitations:** 
-          * These are *modeled regional projections* rather than verified corporate payroll audits. Actual local hiring varies significantly based on automation level, cloud provider outsourcing, and local labor market availability.
+        * **Methodology:** The dataset sets estimated capacity to operational MW when available, otherwise planned MW. It estimates direct operational jobs as capacity × 0.4, rounded to a whole job; total operational jobs as direct jobs × 3.0, rounded; and peak construction jobs as capacity × 15. These are fixed project assumptions.
+        * **Limitations:**
+          * These are modeled estimates, not verified payroll or construction counts. The same multipliers are applied across facilities and do not account for local hiring, automation, construction schedules, or regional economic conditions.
         """)
         
-        st.markdown("### 🗺️ 4. Spatial Join & FIPS Precision")
+        st.markdown("### 4. Spatial Join & FIPS Precision")
         st.markdown("""
-        * **Methodology:** Facilities (Compute Atlas coordinates) are spatially mapped and joined to county-level drought and socioeconomic tables using 5-digit FIPS codes.
-        * **Limitations:** 
-          * Large rural counties or sprawling facility footprints can occasionally span multiple census tracts, leading to localized demographic blurring.
+        * **Methodology:** Facility state and county names are normalized and matched to county-equivalent names in the 2024 ACS county table to assign 5-digit county FIPS codes. Those FIPS codes are used to join ACS socioeconomic and latest available drought data. Facility coordinates are used to plot markers, not to perform a point-in-polygon county join.
+        * **Limitations:**
+          * Socioeconomic values are county-level ACS 5-year estimates for 2024, not census-tract data or facility-specific measurements. County averages can hide substantial neighborhood-level differences.
+          * Facilities with unmatched or ambiguous county names have no county-level enrichment. Map coordinates may be approximate and do not represent verified facility parcel boundaries.
         """)
+
+    st.info(
+        "**Map capacity transparency:** If a facility has no reported operational or "
+        "planned MW value, the map substitutes 10 MW only in its temporary display data "
+        "for marker sizing, the capacity filter, and capacity coloring. The placeholder "
+        "does not alter the master dataset or feed the emissions and jobs estimates."
+    )
 
     st.markdown("---")
     
