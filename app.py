@@ -491,7 +491,7 @@ elif st.session_state.page == 'Findings':
     with col_gh:
         st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/govrahul/explainable_ai-data_center_analysis)")
     with col_li:
-        st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/govrahul)")
+        st.markdown("[![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-0A66C2?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/govrahul)")
 
     with st.expander("Full Methodology & Limitations Report"):
         st.markdown("""
