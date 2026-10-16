@@ -455,7 +455,7 @@ elif st.session_state.page == 'Map':
 # ============================================================
 elif st.session_state.page == 'Findings':
     st.markdown("# Key Findings & Strategic Next Steps")
-    st.markdown("Summary takeaways from our multi-layered national infrastructure audit.")
+    st.markdown("Summary takeaways from my multi-layered national infrastructure audit.")
     
     col1, col2 = st.columns(2)
     with col1:
